@@ -3,8 +3,6 @@ library(tidyverse)
 library(stringr)
 
 
-
-
 #-------------------------------------------------------
 #Funcion to reticulate python sentence tokenizer 
 #-------------------------------------------------------
@@ -156,4 +154,81 @@ dtm_build <- function(raw_corpus, tfidf=FALSE)
   return(dtm1)  }   # end of function
 
 
+#------------------------------------
+#Create DTM
+#------------------------------------
 
+create_DTM = function(text,
+                      docID = NULL,
+                      replace_ngrm = T,
+                      #rm_stop_words = T,
+                      textcleaning = T,
+                      lower = T,
+                      alphanum = T,
+                      drop_num = T,
+                      #stop_custom = c('will','was', 'can'),
+                      #smart_stop_words = T,
+                      tfidf = F,
+                      bi_gram_pct = 0.05,
+                      min_freq = 5,
+                      filter = 'pct',
+                      py.sent_tknzr = T)
+{
+  if(is.null(docID))
+  {
+    docID = 1:length(text)
+  }
+  if(replace_ngrm==T)
+  {
+    replaced_text = replace_ngram(text=text,
+                                  bi_gram_pct = bi_gram_pct,
+                                  min_freq = min_freq,
+                                  filter = filter,
+                                  py.sent_tknzr = py.sent_tknzr,
+                                  textcleaning = textcleaning,
+                                  lower = lower,
+                                  alphanum = alphanum,
+                                  drop_num = drop_num)
+                                  #rm_stop_words = rm_stop_words,
+                                  #stop_custom = stop_custom,
+                                  #smart_stop_words = smart_stop_words)
+    replaced_text$docID = docID
+  }
+  else{
+    if(textcleaning==T)
+    {
+      text = text_clean(text)
+    }
+    replaced_text = data_frame(text = text, docID = docID)
+  }
+  
+  
+  #tokenizing the corpus
+  
+  textdf1 = replaced_text %>%
+            group_by(docID)%>%
+            unnest_tokens(word,text)%>%
+            count(word, sort = TRUE) %>% ungroup()
+  
+  #cast into matrix object
+  
+  if (tfidf == "TRUE")
+  {
+    textdf2 = textdf1 %>% group_by(docID) %>%
+              count(word, sort = TRUE) %>% ungroup() %>% 
+              bind_tf_idf(word, docID, nn) %>%
+              rename(value = tf_idf)
+  }
+  else
+  {
+    textdf2 = textdf1 %>% rename(value=n)
+  }
+  
+  m <- textdf2 %>% cast_sparse(docID, word, value)
+  
+  #reorder DTM to have sorted rows by doc_num and cols by colsums
+  
+  b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
+  dtm = m[,b0]
+  return (dtm)  #end of function
+}
