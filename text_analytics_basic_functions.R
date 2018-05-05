@@ -353,13 +353,13 @@ replace_ngram <- function(text,
 create_DTM = function(text,
                       docID = NULL,
                       replace_ngrm = T,
-                      #rm_stop_words = T,
+                      rm_stop_words = T,
                       textcleaning = T,
                       lower = T,
                       alphanum = T,
                       drop_num = T,
-                      #stop_custom = c('will','was', 'can'),
-                      #smart_stop_words = T,
+                      stop_custom = c('will','was', 'can'),
+                      smart_stop_words = T,
                       tfidf = F,
                       bi_gram_pct = 0.05,
                       min_freq = 5,
@@ -380,10 +380,10 @@ create_DTM = function(text,
                                   textcleaning = textcleaning,
                                   lower = lower,
                                   alphanum = alphanum,
-                                  drop_num = drop_num)
-                                  #rm_stop_words = rm_stop_words,
-                                  #stop_custom = stop_custom,
-                                  #smart_stop_words = smart_stop_words)
+                                  drop_num = drop_num,
+                                  rm_stop_words = rm_stop_words,
+                                  stop_custom = stop_custom,
+                                  smart_stop_words = smart_stop_words)
     replaced_text$docID = docID
   }
   else{
@@ -424,3 +424,4 @@ create_DTM = function(text,
   dtm = m[,b0]
   return (dtm)  #end of function
 }
+
