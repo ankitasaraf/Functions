@@ -154,6 +154,198 @@ dtm_build <- function(raw_corpus, tfidf=FALSE)
   return(dtm1)  }   # end of function
 
 
+
+#--------------------------------------------------------------#
+# 4 - Replacing bi grams
+#--------------------------------------------------------------#  
+replace_ngram <- function(text, 
+                          bi_gram_pct = 0.05,
+                          min_freq = 5, 
+                          filter = 'pct', 
+                          py.sent_tknzr = T, 
+                          textcleaning = T,
+                          lower=T,
+                          alphanum=T, 
+                          drop_num=T,
+                          rm_stop_words=T,
+                          stop_custom = c('will','was','can'),
+                          smart_stop_words = T
+){
+  
+  text_orig = text
+  # Cleaning text
+  if( textcleaning == T) {
+    text = clean_text(text,lower = lower, alphanum = alphanum, drop_num = drop_num)
+  }
+  
+  # defining smart stop words
+  smart_stop = c("i","me","my","myself","we","our","ours","ourselves","you","your","yours","yourself","yourselves","he","him","his","himself","she","her","hers","herself",
+                 "it","its","itself","they","them","their","theirs","themselves","what","which","who","whom","this","that","these","those","am","is","are","was","were","be",
+                 "been","being","have","has","had","having","do","does","did","doing","would","should","could","ought","i'm","you're","he's","she's","it's","we're","they're",
+                 "i've","you've","we've","they've","i'd","you'd","he'd","she'd","we'd","they'd","i'll","you'll","he'll","she'll","we'll","they'll","isn't","aren't","wasn't",
+                 "weren't","hasn't","haven't","hadn't","doesn't","don't","didn't","won't","wouldn't","shan't","shouldn't","can't","cannot","couldn't","mustn't","let's","that's",
+                 "who's","what's","here's","there's","when's","where's","why's","how's","a","an","the","and","but","if","or","because","as","until","while","of","at","by","for",
+                 "with","about","against","between","into","through","during","before","after","above","below","to","from","up","down","in","out","on","off","over","under",
+                 "again","further","then","once","here","there","when","where","why","how","all","any","both","each","few","more","most","other","some","such","no","nor","not",
+                 "only","own","same","so","than","too","very","a's","able","according","accordingly","across","actually","afterwards","ain't","allow","allows","almost","alone",
+                 "along","already","also","although","always","among","amongst","another","anybody","anyhow","anyone","anything","anyway","anyways","anywhere","apart","appear",
+                 "appreciate","appropriate","around","aside","ask","asking","associated","available","away","awfully","b","became","become","becomes","becoming","beforehand",
+                 "behind","believe","beside","besides","best","better","beyond","brief","c","c'mon","c's","came","can","cant","cause","causes","certain","certainly","changes",
+                 "clearly","co","com","come","comes","concerning","consequently","consider","considering","contain","containing","contains","corresponding","course","currently",
+                 "d","definitely","described","despite","different","done","downwards","e","edu","eg","eight","either","else","elsewhere","enough","entirely","especially","et",
+                 "etc","even","ever","every","everybody","everyone","everything","everywhere","ex","exactly","example","except","f","far","fifth","first","five","followed",
+                 "following","follows","former","formerly","forth","four","furthermore","g","get","gets","getting","given","gives","go","goes","going","gone","got","gotten",
+                 "greetings","h","happens","hardly","hello","help","hence","hereafter","hereby","herein","hereupon","hi","hither","hopefully","howbeit","however","ie",
+                 "ignored","immediate","inasmuch","inc","indeed","indicate","indicated","indicates","inner","insofar","instead","inward","it'd","it'll","j","just","k",
+                 "keep","keeps","kept","know","knows","known","l","last","lately","later","latter","latterly","least","less","lest","let","like","liked","likely",
+                 "little","look","looking","looks","ltd","m","mainly","many","may","maybe","mean","meanwhile","merely","might","moreover","mostly","much","must",
+                 "n","name","namely","nd","near","nearly","necessary","need","needs","neither","never","nevertheless","new","next","nine","nobody","non","none",
+                 "noone","normally","nothing","novel","now","nowhere","o","obviously","often","oh","ok","okay","old","one","ones","onto","others","otherwise",
+                 "outside","overall","p","particular","particularly","per","perhaps","placed","please","plus","possible","presumably","probably","provides",
+                 "q","que","quite","qv","r","rather","rd","re","really","reasonably","regarding","regardless","regards","relatively","respectively","right",
+                 "s","said","saw","say","saying","says","second","secondly","see","seeing","seem","seemed","seeming","seems","seen","self","selves","sensible",
+                 "sent","serious","seriously","seven","several","shall","since","six","somebody","somehow","someone","something","sometime","sometimes","somewhat",
+                 "somewhere","soon","sorry","specified","specify","specifying","still","sub","sup","sure","t","t's","take","taken","tell","tends","th","thank","thanks",
+                 "thanx","thats","thence","thereafter","thereby","therefore","therein","theres","thereupon","think","third","thorough","thoroughly","though","three","throughout",
+                 "thru","thus","together","took","toward","towards","tried","tries","truly","try","trying","twice","two","u","un","unfortunately","unless","unlikely","unto","upon",
+                 "us","use","used","useful","uses","using","usually","uucp","v","value","various","via","viz","vs","w","want","wants","way","welcome","well","went","whatever","whence",
+                 "whenever","whereafter","whereas","whereby","wherein","whereupon","wherever","whether","whither","whoever","whole","whose","will","willing","wish","within","without",
+                 "wonder","x","y","yes","yet","z")
+  
+  # removing stopwords
+  
+  if (rm_stop_words == T) {
+    if(smart_stop_words == T){
+      stop = unique(tolower(c(stop_custom,smart_stop)))
+    } else {
+      stop = unique(tolower(stop_custom))
+    }
+    text = c_remove_words(text,stop)
+  }
+  
+  
+  textdf = data_frame(text = text, docID = 1:length(text))
+  
+  # Build All possible bigram list
+  bigram_df_orig = textdf %>% group_by(docID) %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+    separate(bigram, c("word1", "word2"), sep = " ") %>% 
+    unite(bigram1, word1, word2, sep = " ", remove = FALSE) %>%
+    ungroup()
+  
+  if (py.sent_tknzr == T) {
+    # now first split corpus in sentences to get the vaalid bi-grams
+    sentdf = py.sent_tokenize(text_orig)
+    if( textcleaning == T) {
+      sentdf$text = clean_text(sentdf$text,lower = lower, alphanum = alphanum, drop_num = drop_num)
+    }
+    
+    if (rm_stop_words == T) {
+      if(smart_stop_words == T){
+        stop = unique(tolower(c(stop_custom,smart_stop)))
+      } else {
+        stop = unique(tolower(stop_custom))
+      }
+      sentdf$text = c_remove_words(sentdf$text,stop)
+    }
+    
+    
+  } else {
+    sentdf = data_frame(text = text, docID = 1:length(text), sentID = 1:length(text))
+  }
+  
+  # get the valid bi-grams based on sentence level corpus for replacement
+  bigram_df <- sentdf %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+    separate(bigram, c("word1", "word2"), sep = " ") %>%
+    count(word1, word2, sort = T) %>%
+    filter(n >= 2) %>%     # valid bi-grams
+    unite(bigram1, word1, word2, sep = " ", remove = FALSE) %>%
+    unite(bigram2, word1, word2, sep = "_")
+  
+  # if (filter = 'pct') {
+  bigram_df1 = bigram_df[1:round(nrow(bigram_df)*bi_gram_pct),]  
+  # } else {
+  bigram_df2 = bigram_df %>% filter(n >= min_freq)
+  # }
+  
+  # Print counts of bi-grams
+  print(paste0("Toatl first ",bi_gram_pct*100, "% bi-grams identified is ", (nrow(bigram_df1))))
+  print(paste0(nrow(bigram_df2)," bi-grams identified with minimum frequency ", (min_freq)))
+  
+  if (filter == 'pct') {
+    bigram_df = bigram_df1 }
+  else {
+    bigram_df = bigram_df2
+  }
+  
+  # merge the two bi-grams set
+  merged_df1 <- left_join(bigram_df_orig, bigram_df, by=c("bigram1"="bigram1"))
+  
+  # first, replace NAs with word1
+  a0 = (is.na(merged_df1$bigram2))
+  merged_df1$bigram2[a0] = merged_df1$word1[a0]
+  
+  # and NAs count with n = 1
+  merged_df1$n[a0] = 1
+  
+  # create vectors for each column of merged df for faster loop operations
+  docID = merged_df1$docID
+  bigram1 = merged_df1$bigram1
+  bigram2 = merged_df1$bigram2
+  nvec = merged_df1$n
+  word1 = merged_df1$word1
+  word2 = merged_df1$word2
+  
+  # system.time({
+  i = 1
+  while(i < (nrow(merged_df1))){             
+    
+    if (docID[i] == docID[i+1]){
+      
+      if (grepl("_",bigram2[i]) & grepl("_",bigram2[i+1]) ) {
+        if (nvec[i] >= nvec[i+1]){ 
+          bigram2[i+1] = ""
+        } else { bigram2[i] = word1[i]} 
+      }
+      
+      if (grepl("_",bigram2[i])){
+        bigram2[i+1] = ""
+      }    
+      
+    } else if (!(docID[i] == docID[i+1]) ) {
+      if (grepl("_",bigram2[i-1])) {
+        bigram2[i] = word2[i]
+      } else if (!grepl("_",bigram2[i])) {
+        bigram2[i] = bigram1[i]
+      }
+    }
+    i = i + 1  
+  }
+  if (!grepl("_",bigram2[i])) {bigram2[i] = bigram1[i]}
+  
+  # })
+  
+  merged_df1$bigram2 = bigram2
+  
+  # Now, finally, roll-back the tokens into a doc string
+  cleaned_corpus = data.frame(docID = numeric(), text = character(), stringsAsFactors=FALSE) # define empty df to populate
+  tokens_only = merged_df1 %>% select(docID, bigram2)
+  
+  for (i1 in 1:nrow(textdf)){
+    a100 = tokens_only[tokens_only$docID == i1,]   # for each doc, collect all cleaned tokens
+    
+    if (nrow(a100) == 0){
+      cleaned_corpus[i1, 1] =  i1
+      cleaned_corpus[i1, 2] = "NA_BLANK"
+    } else {
+      cleaned_corpus[i1, 1] =  i1
+      cleaned_corpus[i1, 2] = str_c(a100$bigram2, collapse=" ")   # using str_c()
+    }
+    
+    if (i1 %% 100 == 0) {cat(i1, " docs processed\n")}   # counter for docs processed. Run '?%%'
+  } # i1 loop ends
+  
+  return(cleaned_corpus)   }    # func ends  
+
 #------------------------------------
 #Create DTM
 #------------------------------------
