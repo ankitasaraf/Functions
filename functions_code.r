@@ -149,7 +149,7 @@ replace_ngram <- function(text,
     
     
   } else {
-    sentdf = data.frame(text = text, docID = 1:length(text), sentID = 1:length(text))
+    sentdf = data_frame(text = text, docID = 1:length(text), sentID = 1:length(text))
   }
   
   # get the valid bi-grams based on sentence level corpus for replacement
@@ -294,7 +294,7 @@ create_DTM = function(text,
       text = c_remove_words(text,stop)
     }
     
-    replaced_text = data.frame(text = text, docID = docID)
+    replaced_text = data_frame(text = text, docID = docID)
   }
   
   
