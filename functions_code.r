@@ -3,7 +3,7 @@ library(tidytext)
 library(stringr)
 
 #--------------------------------------------------------------#
-# 1 - Reticulate python setence tokenizer with python NLTK
+# 1 - Reticulate python sentence tokenizer with python NLTK
 #--------------------------------------------------------------#
 
 py.sent_tokenize = function(text) {
@@ -16,7 +16,7 @@ py.sent_tokenize = function(text) {
   counter = 0
   
   for (i in 1:length(text)){  
-    if (!grepl('[:alnum:]',text[i])) {text[i] = "NO sentecne"}
+    if (!grepl('[:alnum:]',text[i])) {text[i] = "NO sentence"}
     sents = nltk$tokenize$sent_tokenize(text[i])
     sent_list[[i]] = data.frame(docID = i, 
                                 sentID = counter + seq(1:length(sents)), 
@@ -26,11 +26,11 @@ py.sent_tokenize = function(text) {
     counter = max(sent_list[[i]]$sentID)   }    # i ends
   
   sent_df = bind_rows(sent_list)   
-  return(sent_df)  }   # func ends
+  return(sent_df)  }   # py.sent_tokenize() ends
 
 
 #--------------------------------------------------------------#
-# 2 - basic text cleaning
+# 2 - Basic text cleaning
 #--------------------------------------------------------------#
 
 clean_text <- function(text, lower=T, alphanum=T, drop_num=T){
@@ -49,7 +49,7 @@ clean_text <- function(text, lower=T, alphanum=T, drop_num=T){
 # 3 - Removing Stop Words
 #--------------------------------------------------------------#
 
-c_remove_words =  function (x, words) {
+remove_words =  function (x, words) {
   gsub(sprintf("(*UCP)\\b(%s)\\b", paste(sort(words, decreasing = TRUE), 
                                          collapse = "|")), "", x, perl = TRUE) }
 
@@ -119,7 +119,7 @@ replace_ngram <- function(text,
     } else {
       stop = unique(tolower(stop_custom))
     }
-    text = c_remove_words(text,stop)
+    text = remove_words(text,stop)
   }
   
   
@@ -132,7 +132,7 @@ replace_ngram <- function(text,
     ungroup()
   
   if (py.sent_tknzr == T) {
-    # now first split corpus in sentences to get the vaalid bi-grams
+    # Split corpus into sentences to get valid bigrams
     sentdf = py.sent_tokenize(text_orig)
     if( textcleaning == T) {
       sentdf$text = clean_text(sentdf$text,lower = lower, alphanum = alphanum, drop_num = drop_num)
@@ -144,7 +144,7 @@ replace_ngram <- function(text,
       } else {
         stop = unique(tolower(stop_custom))
       }
-      sentdf$text = c_remove_words(sentdf$text,stop)
+      sentdf$text = remove_words(sentdf$text,stop)
     }
     
     
@@ -152,7 +152,7 @@ replace_ngram <- function(text,
     sentdf = data_frame(text = text, docID = 1:length(text), sentID = 1:length(text))
   }
   
-  # get the valid bi-grams based on sentence level corpus for replacement
+  # get the valid bi-grams for replacement
   bigram_df <- sentdf %>% unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
     separate(bigram, c("word1", "word2"), sep = " ") %>%
     count(word1, word2, sort = T) %>%
@@ -166,8 +166,8 @@ replace_ngram <- function(text,
   bigram_df2 = bigram_df %>% filter(n >= min_freq)
   # }
   
-  # Print counts of bi-grams
-  print(paste0("Toatl first ",bi_gram_pct*100, "% bi-grams identified is ", (nrow(bigram_df1))))
+  # Print bi-gram count
+  print(paste0("Total first ",bi_gram_pct*100, "% bi-grams identified is ", (nrow(bigram_df1))))
   print(paste0(nrow(bigram_df2)," bi-grams identified with minimum frequency ", (min_freq)))
   
   if (filter == 'pct') {
@@ -176,7 +176,7 @@ replace_ngram <- function(text,
     bigram_df = bigram_df2
   }
   
-  # merge the two bi-grams set
+  # merge the two bi-grams
   merged_df1 <- left_join(bigram_df_orig, bigram_df, by=c("bigram1"="bigram1"))
   
   # first, replace NAs with word1
@@ -186,7 +186,7 @@ replace_ngram <- function(text,
   # and NAs count with n = 1
   merged_df1$n[a0] = 1
   
-  # create vectors for each column of merged df for faster loop operations
+  # create vectors for each column of merged df
   docID = merged_df1$docID
   bigram1 = merged_df1$bigram1
   bigram2 = merged_df1$bigram2
@@ -225,7 +225,7 @@ replace_ngram <- function(text,
   
   merged_df1$bigram2 = bigram2
   
-  # Now, finally, roll-back the tokens into a doc string
+  # Roll-back the tokens into a doc string
   cleaned_corpus = data.frame(docID = numeric(), text = character(), stringsAsFactors=FALSE) # define empty df to populate
   tokens_only = merged_df1 %>% select(docID, bigram2)
   
@@ -291,7 +291,7 @@ create_DTM = function(text,
       } else {
         stop = unique(tolower(stop_custom))
       }
-      text = c_remove_words(text,stop)
+      text = remove_words(text,stop)
     }
     
     replaced_text = data_frame(text = text, docID = docID)
