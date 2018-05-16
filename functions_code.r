@@ -388,3 +388,102 @@ plot.barchart <- function(dtm, num_tokens=15, fill_color="Blue")
     labs(x= "New words", y = "Frequency", title = "New words frequency chart")
   
   plot(p) }  # func ends
+
+
+#----------------------------------
+# 8 - COG graph
+#----------------------------------
+
+distill.cog = function(dtm, # input dtm
+                       title="COG", # title for the graph
+                       central.nodes=4,    # no. of central nodes
+                       max.connexns = 5){  # max no. of connections  
+  
+  # first convert dtm to an adjacency matrix
+  dtm1 = as.matrix(dtm)   # need it as a regular matrix for matrix ops like %*% to apply
+  adj.mat = t(dtm1) %*% dtm1    # making a square symmatric term-term matrix 
+  diag(adj.mat) = 0     # no self-references. So diag is 0.
+  a0 = order(apply(adj.mat, 2, sum), decreasing = T)   # order cols by descending colSum
+  mat1 = as.matrix(adj.mat[a0[1:50], a0[1:50]])
+  
+  # now invoke network plotting lib igraph
+  library(igraph)
+  
+  a = colSums(mat1) # collect colsums into a vector obj a
+  b = order(-a)     # nice syntax for ordering vector in decr order  
+  
+  mat2 = mat1[b, b]     # order both rows and columns along vector b  
+  diag(mat2) =  0
+  
+  ## +++ go row by row and find top k adjacencies +++ ##
+  
+  wc = NULL
+  
+  for (i1 in 1:central.nodes){ 
+    thresh1 = mat2[i1,][order(-mat2[i1, ])[max.connexns]]
+    mat2[i1, mat2[i1,] < thresh1] = 0   # neat. didn't need 2 use () in the subset here.
+    mat2[i1, mat2[i1,] > 0 ] = 1
+    word = names(mat2[i1, mat2[i1,] > 0])
+    mat2[(i1+1):nrow(mat2), match(word,colnames(mat2))] = 0
+    wc = c(wc, word)
+  } # i1 loop ends
+  
+  
+  mat3 = mat2[match(wc, colnames(mat2)), match(wc, colnames(mat2))]
+  ord = colnames(mat2)[which(!is.na(match(colnames(mat2), colnames(mat3))))]  # removed any NAs from the list
+  mat4 = mat3[match(ord, colnames(mat3)), match(ord, colnames(mat3))]
+  
+  # building and plotting a network object
+  graph <- graph.adjacency(mat4, mode = "undirected", weighted=T)    # Create Network object
+  graph = simplify(graph) 
+  V(graph)$color[1:central.nodes] = "green"
+  V(graph)$color[(central.nodes+1):length(V(graph))] = "pink"
+  
+  graph = delete.vertices(graph, V(graph)[ degree(graph) == 0 ]) # delete singletons?
+  
+  plot(graph, 
+       layout = layout.kamada.kawai, 
+       main = title)
+  
+} # distill.cog func ends
+
+#-----------------------------------------
+# 9 - Lemmatizing
+#-----------------------------------------
+
+lemmatize.corpus <- function(df)
+{
+  library(udpipe)
+  library(stringr)
+  english_model = udpipe_load_model('C:/Users/saraf/Desktop/CBA/Term 1/Text Analytics/Assignments/Group Assignment Data files-20180503/english-ud-2.0-170801.udpipe')
+  
+  dim(df)
+  text = df$bd.text
+  fname = sapply(strsplit(df$file,"_"),'[[',1)
+  x <- udpipe_annotate(english_model, x = text)
+  x <- as.data.frame(x)
+  head(x)
+  x = x[,c('doc_id', 'lemma')]
+  
+  lemma_corpus = data.frame(docID = character(), text = character(), stringsAsFactors = FALSE)
+  
+  for (k in 1:nrow(df))
+  {
+    a100 = x[x$doc_id == paste0('doc', k),]   #collect all cleaned tokens for each document
+    if(nrow(a100)==0)
+    {
+      lemma_corpus[k,1] = k
+      lemma_corpus[k,2] = 'NA_BLANK'
+    }
+    else
+    {
+      lemma_corpus[k,1] = k
+      lemma_corpus[k,2] = str_c(a100$lemma, collapse = " ")
+    }
+    if (k %% 100 ==0)
+    {
+      cat(k," documents processed\n")
+    }
+  }
+  return(lemma_corpus)
+} #end of function
