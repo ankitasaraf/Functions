@@ -18,7 +18,7 @@ text.clean = function(x,                    # x=text_corpus
   if (remove_stopwords){
     
     # read std stopwords list from my git
-    stpw1 = readLines('https://raw.githubusercontent.com/sudhir-voleti/basic-text-analysis-shinyapp/master/data/stopwords.txt')
+    stpw1 = readLines('https://raw.githubusercontent.com/ankitasaraf/Text-Analytics/master/stopwords.txt')
     
     # tm package stop word list; tokenizer package has the same name function, hence 'tm::'
     stpw2 = tm::stopwords('english')      
